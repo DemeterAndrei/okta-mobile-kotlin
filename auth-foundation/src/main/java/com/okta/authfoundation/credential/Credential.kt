@@ -112,7 +112,9 @@ class Credential internal constructor(
      * Internally, this uses [Credential.getValidAccessToken] to automatically refresh the access token if it's expired.
      */
     suspend fun getUserInfo(): OidcClientResult<OidcUserInfo> {
-        val accessToken = getValidAccessToken() ?: return OidcClientResult.Error(IllegalStateException("No Access Token."))
+        val accessToken = getValidAccessToken() ?: return OidcClientResult.Error(
+            IllegalStateException("No Access Token.")
+        )
         return oidcClient.getUserInfo(accessToken)
     }
 
@@ -125,16 +127,19 @@ class Credential internal constructor(
         val localToken = token ?: return OidcClientResult.Error(IllegalStateException("No token."))
         val token = when (tokenType) {
             TokenType.REFRESH_TOKEN -> {
-                localToken.refreshToken ?: return OidcClientResult.Error(IllegalStateException("No refresh token."))
+                localToken.refreshToken
+                    ?: return OidcClientResult.Error(IllegalStateException("No refresh token."))
             }
             TokenType.ACCESS_TOKEN -> {
                 localToken.accessToken
             }
             TokenType.ID_TOKEN -> {
-                localToken.idToken ?: return OidcClientResult.Error(IllegalStateException("No id token."))
+                localToken.idToken
+                    ?: return OidcClientResult.Error(IllegalStateException("No id token."))
             }
             TokenType.DEVICE_SECRET -> {
-                localToken.deviceSecret ?: return OidcClientResult.Error(IllegalStateException("No device secret."))
+                localToken.deviceSecret
+                    ?: return OidcClientResult.Error(IllegalStateException("No device secret."))
             }
         }
 
@@ -150,7 +155,11 @@ class Credential internal constructor(
      */
     suspend fun storeToken(token: Token? = this.token, tags: Map<String, String> = this.tags) {
         if (isDeleted) {
-            oidcClient.configuration.eventCoordinator.sendEvent(CredentialStoredAfterRemovedEvent(this))
+            oidcClient.configuration.eventCoordinator.sendEvent(
+                CredentialStoredAfterRemovedEvent(
+                    this
+                )
+            )
             return
         }
         val tokenToStore = token?.copy(
@@ -159,12 +168,19 @@ class Credential internal constructor(
             // Device Secret isn't returned when refreshing.
             deviceSecret = token.deviceSecret ?: this.token?.deviceSecret,
         )
-        val tagsCopy = tags.toMap() // Making a defensive copy, so it's not modified outside our control.
+        val tagsCopy =
+            tags.toMap() // Making a defensive copy, so it's not modified outside our control.
         storage.replace(
             updatedEntry = TokenStorage.Entry(storageIdentifier, tokenToStore, tagsCopy),
         )
         state.value = CredentialState.Data(tokenToStore, tagsCopy)
-        oidcClient.configuration.eventCoordinator.sendEvent(CredentialStoredEvent(this, this.token, this.tags))
+        oidcClient.configuration.eventCoordinator.sendEvent(
+            CredentialStoredEvent(
+                this,
+                this.token,
+                this.tags
+            )
+        )
     }
 
     /**
@@ -191,9 +207,14 @@ class Credential internal constructor(
         return refreshCoalescingOrchestrator.get()
     }
 
+    suspend fun refreshTokenWithStoredToken(refreshToken: String): OidcClientResult<Token> {
+        return oidcClient.refreshToken(refreshToken)
+    }
+
     private suspend fun performRealRefresh(): OidcClientResult<Token> {
         val localToken = token ?: return OidcClientResult.Error(IllegalStateException("No Token."))
-        val refresh = localToken.refreshToken ?: return OidcClientResult.Error(IllegalStateException("No Refresh Token."))
+        val refresh = localToken.refreshToken
+            ?: return OidcClientResult.Error(IllegalStateException("No Refresh Token."))
         return oidcClient.refreshToken(refresh)
     }
 
@@ -210,13 +231,15 @@ class Credential internal constructor(
         val localToken = token ?: return OidcClientResult.Error(IllegalStateException("No token."))
         val token = when (tokenType) {
             RevokeTokenType.REFRESH_TOKEN -> {
-                localToken.refreshToken ?: return OidcClientResult.Error(IllegalStateException("No refresh token."))
+                localToken.refreshToken
+                    ?: return OidcClientResult.Error(IllegalStateException("No refresh token."))
             }
             RevokeTokenType.ACCESS_TOKEN -> {
                 localToken.accessToken
             }
             RevokeTokenType.DEVICE_SECRET -> {
-                localToken.deviceSecret ?: return OidcClientResult.Error(IllegalStateException("No device secret."))
+                localToken.deviceSecret
+                    ?: return OidcClientResult.Error(IllegalStateException("No device secret."))
             }
         }
         return oidcClient.revokeToken(token)
@@ -271,7 +294,8 @@ class Credential internal constructor(
     suspend fun idToken(): Jwt? {
         val idToken = token?.idToken ?: return null
         try {
-            val parser = JwtParser(oidcClient.configuration.json, oidcClient.configuration.computeDispatcher)
+            val parser =
+                JwtParser(oidcClient.configuration.json, oidcClient.configuration.computeDispatcher)
             return parser.parse(idToken)
         } catch (e: Exception) {
             // The token was malformed.
@@ -330,7 +354,11 @@ class Credential internal constructor(
      * be emitted to the associated [EventCoordinator].
      */
     fun accessTokenInterceptor(): Interceptor {
-        return AccessTokenInterceptor(::getValidAccessToken, oidcClient.configuration.eventCoordinator, this)
+        return AccessTokenInterceptor(
+            ::getValidAccessToken,
+            oidcClient.configuration.eventCoordinator,
+            this
+        )
     }
 
     override fun equals(other: Any?): Boolean {
@@ -341,7 +369,7 @@ class Credential internal constructor(
             return false
         }
         return storageIdentifier == other.storageIdentifier &&
-            state.value == other.state.value
+                state.value == other.state.value
     }
 
     override fun hashCode(): Int {
@@ -356,7 +384,9 @@ private sealed class CredentialState {
     open val token: Token? get() = null
     open val tags get() = emptyMap<String, String>()
 
-    data class Data(override val token: Token?, override val tags: Map<String, String>) : CredentialState()
+    data class Data(override val token: Token?, override val tags: Map<String, String>) :
+        CredentialState()
+
     object Deleted : CredentialState()
 }
 
